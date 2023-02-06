@@ -1,47 +1,167 @@
 <?php
-    $name = $_POST['name'];
-    $tel = $_POST['tel'];
-    $email = $_POST['email'];
-    $message = $_POST['message'];
+    $bdServidor = 'localhost';
+    $bdUsuario = 'root';
+    $bdSenha = 'UEG.Trindade:MySql';
+    $bdBanco = 'tarefas';
+    $conexao = mysqli_connect($bdServidor, $bdUsuario, $bdSenha, $bdBanco);
 
-    $data = 0;
-    $hora = 0;
-
-
-    $bdhost = "localhost";
-    $bduser = "root";
-    $bdpass = "";
-    $bddata = "trabalho2";
-    
-    // Conexão com a base de dados
-    $conn = mysqli_connect($bdhost, $bduser, $bdpass, $bddata) or die ("could not connect to mysql"); 
-    mysqli_select_db($conn, "trabalho2") or die ("no database");
-    
-    // Inserção dos dados de entrada no banco de dados
-    
-    $sql = "INSERT INTO mensagens (data, hora , nome, telefone, email, mensagem) VALUES ('{$data}', '{$hora}', '{$name}', '{$tel}', '{$email}', '{$message}')";
-    
-    if ($name == null or $tel == 0 or $email == null or $message == null)
-    {
-    echo "Um dos campos vazios , por favor, prencha todas as informações.";
-    echo "{$name} <br>";
-    echo "{$tel} <br>";
-    echo $email;
-    echo $message;
-    }
-    else
-    {
-        /*
-        if (mysqli_query($conn, $sql)) 
-        {
-            echo "Mensagem enviada com sucesso.";
-        } 
-        else 
-        {
-            echo "Erro ao enviar a mensagem.";
-        } */
-        echo "teste";
+    if (mysqli_connect_errno()) {
+        echo "Problemas para conectar no banco. Verifique os dados!";
+        die();
     }
 
-    mysqli_close($conn);
+    function buscar_tarefas($conexao){
+        $sqlBusca = 'SELECT * FROM tarefas';
+        $resultado = mysqli_query($conexao, $sqlBusca);
+        $tarefas = array();
+        while ($tarefa = mysqli_fetch_assoc($resultado)) {
+            $tarefas[] = $tarefa;
+        }
+        return $tarefas;
+    }
+    function gravar_tarefa($conexao, $tarefa){
+       $data = $tarefa['prazo'] == '' ? '0000-00-00' : $tarefa['prazo'];
+       $sqlGravar = "
+        INSERT INTO tarefas
+            (nome, descricao, prioridade, prazo, concluida)
+            VALUES
+            (
+            '{$tarefa['nome']}',
+            '{$tarefa['descricao']}',
+            {$tarefa['prioridade']},
+            '{$data}',
+            {$tarefa['concluida']}
+            )";
+            //echo $sqlGravar;
+    mysqli_query($conexao, $sqlGravar);
+    }
+    
+    function buscar_tarefa($conexao, $id) {
+        $sqlBusca = 'SELECT * FROM tarefas WHERE id = ' . $id;
+        $resultado = mysqli_query($conexao, $sqlBusca);
+        return mysqli_fetch_assoc($resultado);
+    }
+    function editar_tarefa($conexao, $tarefa)
+    {
+        $data = $tarefa['prazo'] == '' ? '0000-00-00' : $tarefa['prazo'];
+    	$sql = "
+        UPDATE tarefas SET
+            nome = '{$tarefa['nome']}',
+            descricao = '{$tarefa['descricao']}',
+            prioridade = {$tarefa['prioridade']},
+            prazo = '{$data}',
+            concluida = {$tarefa['concluida']}
+            WHERE id = {$tarefa['id']}";
+        mysqli_query($conexao, $sql);
+    }
+    function remover_tarefa($conexao, $id)
+    {
+	    $sqlRemover = "DELETE FROM tarefas WHERE id = {$id}";
+	    mysqli_query($conexao, $sqlRemover);
+    }
+
+    $exibir_tabela = true;
+    $lista_tarefas = array();
+    if (isset($_GET['nome']) && $_GET['nome'] != '') {
+        $tarefa = array();
+        $tarefa['nome'] = $_GET['nome'];
+        if (isset($_GET['descricao'])) {
+            $tarefa['descricao'] = $_GET['descricao'];
+        } else {
+            $tarefa['descricao'] = '';
+        }
+        if (isset($_GET['prazo'])) {
+            $tarefa['prazo'] = traduz_data_para_banco($_GET['prazo']);
+        } else {
+            $tarefa['prazo'] = '';
+        }
+        
+        $tarefa['prioridade'] = $_GET['prioridade'];
+        
+        if (isset($_GET['concluida'])) {
+            $tarefa['concluida'] = 1;
+        } else {
+            $tarefa['concluida'] = 0;
+        }
+        gravar_tarefa($conexao, $tarefa);
+    }
+    $lista_tarefas = buscar_tarefas($conexao);         
+    $tarefa = array(
+        'id' => 0,
+        'nome' => '',
+        'descricao' => '',
+        'prazo' => '',
+        'prioridade' => 1,
+        'concluida' => ''
+    );
+
+
+
+    function traduz_prioridade($codigo)
+{
+    $prioridade = '';
+    switch ($codigo) {
+        case 1:
+            $prioridade = 'Alta';
+            break;
+        case 2:
+            $prioridade = 'Média';
+            break;
+        case 3:
+            $prioridade = 'Baixa';
+            break;
+    }
+    return $prioridade;
+}
+function traduz_data_para_banco($data){
+    if ($data == "") {
+        return "";
+    }
+    $dados = explode("/", $data);
+    $data_mysql = "{$dados[2]}-{$dados[1]}-{$dados[0]}";
+    return $data_mysql;
+}
+function traduz_data_para_exibir($data)
+{
+	if ($data == "" OR $data == "0000-00-00") {
+		return "";
+	}	
+	$dados = explode("-", $data);
+	$data_exibir = "{$dados[2]}/{$dados[1]}/{$dados[0]}";
+	return $data_exibir;
+}
+function traduz_concluida($concluida)
+{
+	if ($concluida == 1) {
+		return 'Sim';
+	}
+	return 'Não';
+}
+
+$exibir_tabela = false;
+if (isset($_GET['nome']) && $_GET['nome'] != '') {
+    $tarefa = array();
+    $tarefa['id'] = $_GET['id'];
+    $tarefa['nome'] = $_GET['nome'];
+    if (isset($_GET['descricao'])) {
+        $tarefa['descricao'] = $_GET['descricao'];
+    } else {
+        $tarefa['descricao'] = '';
+    }
+    if (isset($_GET['prazo'])) {
+        $tarefa['prazo'] = traduz_data_para_banco($_GET['prazo']);
+    } else {
+        $tarefa['prazo'] = '';
+    }
+    $tarefa['prioridade'] = $_GET['prioridade'];
+    if (isset($_GET['concluida'])) {
+        $tarefa['concluida'] = 1;
+    } else {
+        $tarefa['concluida'] = 0;
+    }
+    editar_tarefa($conexao, $tarefa);
+    header('Location: tarefas.php');
+    die();
+}
+$tarefa = buscar_tarefa($conexao, $_GET['id']);
 ?>
